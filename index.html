@@ -277,7 +277,7 @@
       position: relative;
       animation: l9-0 2s infinite;
     }
-    .loader::before { content: "Memuat"; }
+    .loader::before { content: "Loading Sayang"; }
     .loader::after {
       content: "";
       position: absolute;
@@ -467,7 +467,7 @@
       const { data, error } = await sb.from("portfolio").select("*").eq("id", 1).single();
       if (error) {
         document.getElementById("publicContent").innerHTML =
-          `<div class="loading-msg"><i class="fas fa-triangle-exclamation"></i> Gagal memuat data. Pastikan SUPABASE_URL & ANON_KEY sudah diisi dengan benar dan tabel 'portfolio' sudah dibuat.</div>`;
+          `<div class="loading-msg"><i class="fas fa-triangle-exclamation"></i> Gagal memuat data.<br><span style="font-size:0.75rem;opacity:0.8;">Detail: ${escapeHtml(error.message || JSON.stringify(error))}</span></div>`;
         console.error(error);
         return;
       }
@@ -513,7 +513,7 @@
       pinMessage.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memeriksa...';
       const { error } = await sb.auth.signInWithPassword({ email: ADMIN_EMAIL, password });
       if (error) {
-        pinMessage.innerHTML = '<i class="fas fa-times-circle" style="color:#b13e3e;"></i> Password salah. Coba lagi.';
+        pinMessage.innerHTML = '<i class="fas fa-times-circle" style="color:#b13e3e;"></i> Gagal: ' + escapeHtml(error.message || 'Password salah');
         pinMessage.style.color = '#b13e3e';
         pinInput.value = '';
         pinInput.focus();

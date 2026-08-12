@@ -203,8 +203,11 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
     youtube: { icon:"fab fa-youtube", label:"YouTube" },
     tiktok: { icon:"fab fa-tiktok", label:"TikTok" },
     whatsapp: { icon:"fab fa-whatsapp", label:"WhatsApp" },
+    telegram: { icon:"fab fa-telegram", label:"Telegram / Grup" },
+    saweria: { icon:"fas fa-mug-hot", label:"Saweria" },
     email: { icon:"fas fa-envelope", label:"Email" },
-    website: { icon:"fas fa-globe", label:"Website" }
+    website: { icon:"fas fa-globe", label:"Website" },
+    custom: { icon:"fas fa-link", label:"Link Lainnya" }
   };
 
   let currentData = null;
@@ -343,7 +346,8 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
 
     const socialHtml = socials.map(s => {
       const meta = SOCIAL_ICONS[s.platform] || { icon:"fas fa-link", label:s.platform };
-      return `<a href="${escapeAttr(s.url)}" target="_blank" rel="noopener"><i class="${meta.icon}"></i><span>${escapeHtml(meta.label)}</span></a>`;
+      const labelText = (s.label && s.label.trim()) ? s.label.trim() : meta.label;
+      return `<a href="${escapeAttr(s.url)}" target="_blank" rel="noopener"><i class="${meta.icon}"></i><span>${escapeHtml(labelText)}</span></a>`;
     }).join("");
 
     const productHtml = products.map((prod, i) => {
@@ -681,14 +685,13 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
     wrap.innerHTML = adminWorking.socials.map((s, i) => `
       <div class="admin-block">
         <button class="remove-btn" data-idx="${i}"><i class="fas fa-xmark"></i></button>
-        <div class="row2">
-          <div class="field"><label>Platform</label>
-            <select data-idx="${i}" data-field="platform" class="social-field">
-              ${Object.keys(SOCIAL_ICONS).map(k => `<option value="${k}" ${s.platform===k?'selected':''}>${SOCIAL_ICONS[k].label}</option>`).join('')}
-            </select>
-          </div>
-          <div class="field"><label>URL</label><input class="social-field" data-idx="${i}" data-field="url" value="${escapeAttr(s.url||'')}"></div>
+        <div class="field"><label>Platform (untuk ikon)</label>
+          <select data-idx="${i}" data-field="platform" class="social-field">
+            ${Object.keys(SOCIAL_ICONS).map(k => `<option value="${k}" ${s.platform===k?'selected':''}>${SOCIAL_ICONS[k].label}</option>`).join('')}
+          </select>
         </div>
+        <div class="field"><label>Judul yang tampil (opsional, kosongkan untuk pakai judul bawaan)</label><input class="social-field" data-idx="${i}" data-field="label" placeholder="contoh: Join Grup WA, Donasi Saweria" value="${escapeAttr(s.label||'')}"></div>
+        <div class="field"><label>URL</label><input class="social-field" data-idx="${i}" data-field="url" value="${escapeAttr(s.url||'')}"></div>
       </div>`).join('') || '<p style="font-size:0.8rem;color:#1a6188;">Belum ada link sosial media.</p>';
     wrap.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => { adminWorking.socials.splice(+btn.dataset.idx,1); renderSocialForm(); }));
     wrap.querySelectorAll('.social-field').forEach(el => el.addEventListener('input', () => { adminWorking.socials[+el.dataset.idx][el.dataset.field] = el.value; }));

@@ -229,16 +229,14 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
 
   function openCropper(file, aspect, round) {
     return new Promise((resolve, reject) => {
-      const vw = Math.min(window.innerWidth * 0.8, aspect >= 1 ? 320 : 300);
-      const vh = vw / aspect;
       const overlay = document.createElement('div');
       overlay.className = 'crop-overlay';
       overlay.innerHTML = `
-        <div class="crop-viewport ${round ? 'round' : ''}" id="cropViewport" style="width:${vw}px;height:${vh}px;">
+        <div class="crop-viewport ${round ? 'round' : ''}" id="cropViewport">
           <img id="cropImg" draggable="false">
         </div>
         <input type="range" class="crop-zoom" id="cropZoom" min="1" max="4" step="0.01" value="1">
-        <div class="crop-hint">Geser untuk atur posisi, geser slider untuk zoom</div>
+        <div class="crop-hint" id="cropHint">Memuat foto...</div>
         <div class="crop-actions">
           <button id="cropCancel">Batal</button>
           <button id="cropConfirm">Pakai Foto</button>
@@ -248,8 +246,9 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
       const img = overlay.querySelector('#cropImg');
       const viewport = overlay.querySelector('#cropViewport');
       const zoomSlider = overlay.querySelector('#cropZoom');
+      const hint = overlay.querySelector('#cropHint');
       const url = URL.createObjectURL(file);
-      let baseScale = 1, zoom = 1, x = 0, y = 0, natW = 0, natH = 0;
+      let baseScale = 1, zoom = 1, x = 0, y = 0, natW = 0, natH = 0, vw = 0, vh = 0, cropAspect = aspect;
       let dragging = false, lastX = 0, lastY = 0;
 
       function applyTransform(){
@@ -263,9 +262,18 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
       }
       img.onload = () => {
         natW = img.naturalWidth; natH = img.naturalHeight;
+        // rasio 'auto' -> ikut rasio asli foto (tidak dipotong paksa)
+        cropAspect = aspect === 'auto' ? (natW / natH) : aspect;
+        const maxW = Math.min(window.innerWidth * 0.85, 360);
+        const maxH = window.innerHeight * 0.55;
+        vw = maxW; vh = vw / cropAspect;
+        if (vh > maxH) { vh = maxH; vw = vh * cropAspect; }
+        viewport.style.width = vw + 'px';
+        viewport.style.height = vh + 'px';
         baseScale = Math.max(vw / natW, vh / natH);
         x = (vw - natW * baseScale) / 2; y = (vh - natH * baseScale) / 2;
         clamp(); applyTransform();
+        hint.textContent = aspect === 'auto' ? 'Geser untuk atur posisi, geser slider untuk zoom' : 'Geser untuk atur posisi, geser slider untuk zoom';
       };
       img.src = url;
 
@@ -304,8 +312,8 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
 
       overlay.querySelector('#cropCancel').addEventListener('click', () => { cleanup(); reject(new Error('dibatalkan')); });
       overlay.querySelector('#cropConfirm').addEventListener('click', () => {
-        const outW = aspect >= 1 ? 700 : Math.round(700 * aspect);
-        const outH = Math.round(outW / aspect);
+        const outW = cropAspect >= 1 ? 900 : Math.round(900 * cropAspect);
+        const outH = Math.round(outW / cropAspect);
         const canvas = document.createElement('canvas');
         canvas.width = outW; canvas.height = outH;
         const ctx = canvas.getContext('2d');
@@ -748,7 +756,7 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
     wrap.querySelectorAll('.rm-thumb').forEach(btn => btn.addEventListener('click', () => { editingProduct.fotos.splice(+btn.dataset.idx,1); renderFotoThumbs(); }));
     document.getElementById('addFotoBtn').addEventListener('click', async () => {
       try {
-        const url = await pickCropUpload(4/3, false, 'products');
+        const url = await pickCropUpload('auto', false, 'products');
         editingProduct.fotos.push(url);
         renderFotoThumbs();
       } catch(e) { if (e.message !== 'dibatalkan') alert('Gagal upload foto: ' + e.message); }

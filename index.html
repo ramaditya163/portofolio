@@ -20,7 +20,7 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
 .loader { width:fit-content; font-size:17px; font-family:monospace; line-height:1.4; font-weight:bold; color:#075a87;
   background:linear-gradient(#075a87 0 0) left,linear-gradient(#075a87 0 0) right; background-repeat:no-repeat;
   border-right:5px solid #0000; border-left:5px solid #0000; background-origin:border-box; position:relative; animation:l9-0 2s infinite; }
-.loader::before { content:"Memuat"; }
+.loader::before { content:"Loading Sayang"; }
 .loader::after { content:""; position:absolute; top:100%; left:0; width:22px; height:60px;
   background:linear-gradient(90deg,#075a87 4px,#0000 0 calc(100% - 4px),#075a87 0) bottom /22px 20px,
   linear-gradient(90deg,#3b8fc2 4px,#0000 0 calc(100% - 4px),#3b8fc2 0) bottom 10px left 0/22px 6px,
@@ -134,6 +134,11 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
 .foto-thumb-wrap img { width:100%; height:100%; object-fit:cover; border-radius:12px; background:#b8d6ed; }
 .foto-thumb-wrap .rm-thumb { position:absolute; top:-6px; right:-6px; background:#c65050; color:#fff; width:20px; height:20px; border-radius:50%; border:none; font-size:0.65rem; cursor:pointer; }
 .foto-add-btn { width:78px; height:78px; border-radius:12px; border:2px dashed #8fcbff; display:flex; align-items:center; justify-content:center; color:#2b7fb0; font-size:1.4rem; cursor:pointer; background:rgba(255,255,255,0.4); }
+
+/* ===== IMAGE FULLSCREEN VIEWER (pinch zoom) ===== */
+.imgview-overlay { position:fixed; inset:0; background:#000; z-index:3000; display:flex; align-items:center; justify-content:center; overflow:hidden; touch-action:none; }
+.imgview-overlay img { max-width:none; max-height:none; touch-action:none; user-select:none; -webkit-user-drag:none; will-change:transform; }
+.imgview-close { position:absolute; top:16px; right:16px; width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,0.15); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; cursor:pointer; z-index:3001; }
 
 /* ===== CROP MODAL ===== */
 .crop-overlay { position:fixed; inset:0; background:rgba(0,15,30,0.9); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:20px; }
@@ -351,13 +356,13 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
         <div class="foto-kiri"><div class="foto-bulat" style="background-image:url('${escapeAttr(p.foto_url || '')}');"></div></div>
         <div class="info-teks">
           <h1>${escapeHtml(p.nama || '')}</h1>
-          <div class="sub"><span><i class="fas fa-code"></i> ${escapeHtml(p.role || '')}</span><span><i class="fas fa-map-pin"></i> ${escapeHtml(p.lokasi || '')}</span></div>
-          <div class="bio-text"><i class="fas fa-quote-left"></i> ${escapeHtml(p.bio || '')}</div>
+          <div class="sub"><span>${escapeHtml(p.role || '')}</span><span><i class="fas fa-map-pin"></i> ${escapeHtml(p.lokasi || '')}</span></div>
+          <div class="bio-text">${escapeHtml(p.bio || '')}</div>
         </div>
       </div>
       <div class="sosial-section"><div class="sosial-linktree">${socialHtml}</div></div>
       <div class="produk-section"><h3><i class="fas fa-box"></i> Produk</h3><div class="produk-grid">${productHtml}</div></div>
-      <div class="foter"><div class="made"><i class="far fa-copyright"></i> 2026 ${escapeHtml(p.nama || '')} · Portofolio</div></div>`;
+      <div class="foter"><div class="made">${escapeHtml(p.footer_text || ('© 2026 ' + (p.nama||'') + ' · Portofolio'))}</div></div>`;
 
     document.querySelectorAll('.produk-item').forEach(el => {
       el.addEventListener('click', () => openProductDetail(products[+el.dataset.idx]));
@@ -415,10 +420,101 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
     });
 
     document.querySelectorAll('.pd-slide img').forEach(img => {
-      img.addEventListener('click', () => img.classList.toggle('zoomed'));
+      img.addEventListener('click', () => openImageViewer(img.src));
     });
   }
   function closeProductDetail(){ document.getElementById('productOverlay').classList.remove('show'); }
+
+  // ================= VIEWER FOTO FULLSCREEN (pinch zoom) =================
+  function openImageViewer(src){
+    const overlay = document.createElement('div');
+    overlay.className = 'imgview-overlay';
+    overlay.innerHTML = `<div class="imgview-close" id="imgvClose"><i class="fas fa-xmark"></i></div><img id="imgvImg" src="${escapeAttr(src)}">`;
+    document.body.appendChild(overlay);
+    const img = overlay.querySelector('#imgvImg');
+
+    let scale = 1, x = 0, y = 0;
+    let lastDist = null, lastMid = null;
+    const pointers = new Map();
+
+    function fitImage(){
+      // pusatkan gambar begitu selesai load, ukuran natural agar bisa di-scale bebas
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      const fitScale = Math.min(vw / iw, vh / ih);
+      img.style.width = iw + 'px';
+      img.style.height = ih + 'px';
+      scale = fitScale; x = (vw - iw * fitScale) / 2; y = (vh - ih * fitScale) / 2;
+      apply();
+    }
+    function apply(){
+      img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+      img.style.transformOrigin = '0 0';
+      img.style.position = 'absolute'; img.style.top = '0'; img.style.left = '0';
+    }
+    function dist(p1, p2){ return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
+    function mid(p1, p2){ return { x:(p1.x+p2.x)/2, y:(p1.y+p2.y)/2 }; }
+
+    if (img.complete && img.naturalWidth) fitImage(); else img.onload = fitImage;
+
+    let dragStart = null;
+    overlay.addEventListener('pointerdown', e => {
+      overlay.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+      if (pointers.size === 1) dragStart = { x:e.clientX, y:e.clientY, ox:x, oy:y };
+      if (pointers.size === 2) {
+        const pts = [...pointers.values()];
+        lastDist = dist(pts[0], pts[1]);
+        lastMid = mid(pts[0], pts[1]);
+      }
+    });
+    overlay.addEventListener('pointermove', e => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+      if (pointers.size === 2) {
+        const pts = [...pointers.values()];
+        const d = dist(pts[0], pts[1]);
+        const m = mid(pts[0], pts[1]);
+        if (lastDist) {
+          const factor = d / lastDist;
+          const newScale = Math.min(6, Math.max(0.5, scale * factor));
+          x = m.x - ((m.x - x) / scale) * newScale;
+          y = m.y - ((m.y - y) / scale) * newScale;
+          scale = newScale;
+          apply();
+        }
+        lastDist = d; lastMid = m;
+      } else if (pointers.size === 1 && dragStart) {
+        x = dragStart.ox + (e.clientX - dragStart.x);
+        y = dragStart.oy + (e.clientY - dragStart.y);
+        apply();
+      }
+    });
+    function endPointer(e){
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) { lastDist = null; }
+      if (pointers.size === 1) {
+        const pts = [...pointers.values()];
+        dragStart = { x:pts[0].x, y:pts[0].y, ox:x, oy:y };
+      }
+    }
+    overlay.addEventListener('pointerup', endPointer);
+    overlay.addEventListener('pointercancel', endPointer);
+
+    let lastTap = 0;
+    overlay.addEventListener('pointerup', e => {
+      if (pointers.size > 0) return;
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        scale = scale > 1.5 ? Math.min(scale, 1) : scale * 2.5;
+        apply();
+      }
+      lastTap = now;
+    });
+
+    function close(){ overlay.remove(); }
+    overlay.querySelector('#imgvClose').addEventListener('click', close);
+  }
 
   // ================= LOAD DATA =================
   async function loadData() {
@@ -531,6 +627,7 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
         </div>
         <div class="field"><label>Bio singkat</label><textarea id="f-bio">${escapeHtml(p.bio||'')}</textarea></div>
         <div class="field"><label>Nomor WhatsApp (62xxxxxxxxxx)</label><input id="f-wa" value="${escapeAttr(p.nomor_wa||'')}"></div>
+        <div class="field"><label>Teks Footer (bawah halaman)</label><input id="f-footer" value="${escapeAttr(p.footer_text || ('© 2026 ' + (p.nama||'') + ' · Portofolio'))}"></div>
         <button class="btn wide" id="saveBtn"><i class="fas fa-floppy-disk"></i> Simpan Perubahan</button>
         <div class="save-status" id="saveStatus"></div>
       </div>`;
@@ -549,7 +646,8 @@ body { min-height:100vh; background:#cce4f5; display:flex; align-items:flex-star
         lokasi: document.getElementById('f-lokasi').value.trim(),
         bio: document.getElementById('f-bio').value.trim(),
         foto_url: adminWorking.profile.foto_url || '',
-        nomor_wa: document.getElementById('f-wa').value.trim()
+        nomor_wa: document.getElementById('f-wa').value.trim(),
+        footer_text: document.getElementById('f-footer').value.trim()
       };
       saveField({ profile: adminWorking.profile }, document.getElementById('saveStatus'));
     });

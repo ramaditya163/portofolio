@@ -33,10 +33,10 @@ values (
     {"platform": "tiktok", "url": "#"}
   ]'::jsonb,
   '[
-    {"nama": "Web App Pro", "deskripsi": "Sistem manajemen bisnis", "harga": "Rp 1.200.000", "foto_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop"},
-    {"nama": "Mobile UI Kit", "deskripsi": "Desain iOS & Android", "harga": "Rp 850.000", "foto_url": "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop"},
-    {"nama": "Cloud API", "deskripsi": "Integrasi data real-time", "harga": "Rp 2.100.000", "foto_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop"},
-    {"nama": "UI/UX Package", "deskripsi": "Prototype & user research", "harga": "Rp 1.500.000", "foto_url": "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=300&fit=crop"}
+    {"nama": "Web App Pro", "deskripsi": "Sistem manajemen bisnis", "harga": "Rp 1.200.000", "link_pesan": "", "fotos": ["https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop"]},
+    {"nama": "Mobile UI Kit", "deskripsi": "Desain iOS & Android", "harga": "Rp 850.000", "link_pesan": "", "fotos": ["https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop"]},
+    {"nama": "Cloud API", "deskripsi": "Integrasi data real-time", "harga": "Rp 2.100.000", "link_pesan": "", "fotos": ["https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop"]},
+    {"nama": "UI/UX Package", "deskripsi": "Prototype & user research", "harga": "Rp 1.500.000", "link_pesan": "", "fotos": ["https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=300&fit=crop"]}
   ]'::jsonb
 )
 on conflict (id) do nothing;
@@ -53,6 +53,49 @@ create policy "Portfolio dapat dibaca publik"
 create policy "Hanya admin login yang boleh update"
   on portfolio for update
   using (auth.role() = 'authenticated');
+
+-- ============================================================
+-- 6. Bucket penyimpanan FOTO (untuk fitur "pilih dari galeri")
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('portfolio-images', 'portfolio-images', true)
+on conflict (id) do nothing;
+
+create policy "Foto dapat dilihat publik"
+  on storage.objects for select
+  using (bucket_id = 'portfolio-images');
+
+create policy "Admin boleh upload foto"
+  on storage.objects for insert
+  with check (bucket_id = 'portfolio-images' and auth.role() = 'authenticated');
+
+create policy "Admin boleh update foto"
+  on storage.objects for update
+  using (bucket_id = 'portfolio-images' and auth.role() = 'authenticated');
+
+create policy "Admin boleh hapus foto"
+  on storage.objects for delete
+  using (bucket_id = 'portfolio-images' and auth.role() = 'authenticated');
+
+-- ============================================================
+-- 7. MIGRASI (aman dijalankan berkali-kali) — kalau kamu SUDAH PERNAH
+--    menjalankan SQL versi lama sebelumnya, jalankan ini supaya data
+--    produk lama (foto_url tunggal) otomatis diubah ke format foto
+--    banyak (fotos). Kalau ini project baru, boleh dilewati.
+-- ============================================================
+update portfolio
+set products = (
+  select jsonb_agg(
+    case
+      when prod ? 'fotos' then prod
+      when prod ? 'foto_url' then (prod - 'foto_url') || jsonb_build_object('fotos', jsonb_build_array(prod->>'foto_url'), 'link_pesan', coalesce(prod->>'link_pesan',''))
+      else prod || jsonb_build_object('fotos', '[]'::jsonb, 'link_pesan', coalesce(prod->>'link_pesan',''))
+    end
+  )
+  from jsonb_array_elements(products) as prod
+)
+where id = 1;
+
 
 -- ============================================================
 -- LANGKAH TAMBAHAN (di luar SQL ini, lakukan di Dashboard Supabase):
